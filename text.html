@@ -1,0 +1,404 @@
+/* ============================================================
+   EduPapers LK — script.js
+   Vanilla JS: data, rendering, search/filters/sort, pagination,
+   mobile menu, modal, toasts, contact validation, dynamic year.
+   ------------------------------------------------------------
+   DEMO DATA NOTICE
+   The resources below are SAMPLE records for development.
+   They are NOT real examination papers. Replace `fileUrl` with
+   real, lawfully distributable PDF paths/URLs before launch.
+   Leave fileUrl as "" to show the "file unavailable" state.
+   ============================================================ */
+
+"use strict";
+
+/* ---------------- Demo resource data ---------------- */
+const RESOURCES = [
+  { id: 1,  title: "G.C.E. A/L ICT Past Paper",                 level: "A/L",     subject: "ICT",               year: 2022, medium: "English", type: "Past Paper",    format: "PDF", size: null, fileUrl: "", featured: true,
+    desc: "Demo record. Replace with the official A/L ICT 2022 past paper PDF." },
+  { id: 2,  title: "G.C.E. A/L ICT Marking Scheme",             level: "A/L",     subject: "ICT",               year: 2022, medium: "English", type: "Marking Scheme", format: "PDF", size: null, fileUrl: "", featured: false,
+    desc: "Demo record. Replace with the official marking scheme PDF." },
+  { id: 3,  title: "G.C.E. A/L Combined Mathematics Past Paper", level: "A/L",    subject: "Combined Mathematics", year: 2021, medium: "Sinhala", type: "Past Paper",   format: "PDF", size: null, fileUrl: "", featured: true,
+    desc: "Demo record. Combined Maths A/L 2021 paper." },
+  { id: 4,  title: "G.C.E. A/L Physics Past Paper",             level: "A/L",     subject: "Physics",           year: 2020, medium: "Tamil",   type: "Past Paper",    format: "PDF", size: null, fileUrl: "", featured: false,
+    desc: "Demo record. A/L Physics 2020 paper." },
+  { id: 5,  title: "G.C.E. A/L Chemistry Model Paper",          level: "A/L",     subject: "Chemistry",         year: 2023, medium: "English", type: "Model Paper",   format: "PDF", size: null, fileUrl: "", featured: true,
+    desc: "Demo record. A model paper prepared for practice." },
+  { id: 6,  title: "G.C.E. A/L Biology Short Notes",            level: "A/L",     subject: "Biology",           year: 2023, medium: "Sinhala", type: "Notes",          format: "PDF", size: null, fileUrl: "", featured: false,
+    desc: "Demo record. Student study notes." },
+  { id: 7,  title: "G.C.E. A/L Accounting Past Paper",          level: "A/L",     subject: "Accounting",        year: 2019, medium: "English", type: "Past Paper",    format: "PDF", size: null, fileUrl: "", featured: false,
+    desc: "Demo record. A/L Accounting 2019 paper." },
+  { id: 8,  title: "G.C.E. A/L Economics Past Paper",           level: "A/L",     subject: "Economics",         year: 2022, medium: "Sinhala", type: "Past Paper",    format: "PDF", size: null, fileUrl: "", featured: false,
+    desc: "Demo record. A/L Economics 2022 paper." },
+  { id: 9,  title: "G.C.E. O/L Mathematics Past Paper",         level: "O/L",     subject: "Mathematics",       year: 2022, medium: "Sinhala", type: "Past Paper",    format: "PDF", size: null, fileUrl: "", featured: true,
+    desc: "Demo record. O/L Mathematics 2022 paper." },
+  { id: 10, title: "G.C.E. O/L English Language Past Paper",    level: "O/L",     subject: "English",           year: 2021, medium: "English", type: "Past Paper",    format: "PDF", size: null, fileUrl: "", featured: false,
+    desc: "Demo record. O/L English 2021 paper." },
+  { id: 11, title: "G.C.E. O/L Sinhala Language Past Paper",    level: "O/L",     subject: "Sinhala",           year: 2020, medium: "Sinhala", type: "Past Paper",    format: "PDF", size: null, fileUrl: "", featured: false,
+    desc: "Demo record. O/L Sinhala 2020 paper." },
+  { id: 12, title: "G.C.E. O/L Science Model Paper",            level: "O/L",     subject: "Science",           year: 2023, medium: "Tamil",   type: "Model Paper",   format: "PDF", size: null, fileUrl: "", featured: false,
+    desc: "Demo record. O/L Science model paper." },
+  { id: 13, title: "Grade 5 Scholarship Past Paper",            level: "Grade 5", subject: "Scholarship",       year: 2022, medium: "Sinhala", type: "Past Paper",    format: "PDF", size: null, fileUrl: "", featured: true,
+    desc: "Demo record. Grade 5 Scholarship exam 2022 paper." },
+  { id: 14, title: "Grade 5 Scholarship Model Paper",           level: "Grade 5", subject: "Scholarship",       year: 2023, medium: "Tamil",   type: "Model Paper",   format: "PDF", size: null, fileUrl: "", featured: false,
+    desc: "Demo record. Practice model paper for the scholarship exam." },
+  { id: 15, title: "University Java Programming Notes",         level: "University", subject: "ICT",            year: 2024, medium: "English", type: "Notes",          format: "PDF", size: null, fileUrl: "", featured: false,
+    desc: "Demo record. Introductory programming lecture notes." },
+];
+
+/* Subject browsing master list (grouped by level) */
+const SUBJECT_GROUPS = [
+  { level: "A/L", subjects: ["ICT", "Combined Mathematics", "Physics", "Chemistry", "Biology", "Business Studies", "Accounting", "Economics", "Sinhala", "English"] },
+  { level: "O/L", subjects: ["Mathematics", "Science", "Sinhala", "English", "Tamil", "History", "Geography", "ICT", "Business Studies"] },
+  { level: "Grade 5", subjects: ["Scholarship"] },
+  { level: "University", subjects: ["ICT", "Mathematics"] },
+];
+
+const PAGE_SIZE = 6;
+const REPORT_EMAIL = "edupaperslk.report@example.com"; // TODO: change to a real inbox
+
+/* ---------------- Helpers ---------------- */
+const $ = (sel, ctx = document) => ctx.querySelector(sel);
+const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
+const debounce = (fn, ms = 250) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+const TYPE_CLASS = { "Past Paper": "type-paper", "Marking Scheme": "type-scheme", "Model Paper": "type-model", "Notes": "type-notes" };
+const LEVEL_LABEL = { "A/L": "G.C.E. A/L", "O/L": "G.C.E. O/L", "Grade 5": "Grade 5 Scholarship", "University": "University" };
+
+/* ---------------- Toast notifications ---------------- */
+function toast(message, kind = "success", linkHtml = "") {
+  const el = document.createElement("div");
+  el.className = `toast ${kind}`;
+  el.innerHTML = `<span>${message}</span>${linkHtml}`;
+  $("#toastStack").appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity .4s"; setTimeout(() => el.remove(), 400); }, 6000);
+}
+
+/* ---------------- Populate filter dropdowns ---------------- */
+function populateFilters() {
+  const fill = (id, values) => {
+    const sel = $(id);
+    [...new Set(values)].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }))
+      .forEach(v => sel.insertAdjacentHTML("beforeend", `<option value="${v}">${v}</option>`));
+  };
+  fill("#filterLevel", RESOURCES.map(r => r.level));
+  fill("#filterSubject", SUBJECT_GROUPS.flatMap(g => g.subjects));
+  fill("#filterYear", RESOURCES.map(r => r.year));
+}
+
+/* ---------------- Filtering / sorting state ---------------- */
+const state = { search: "", level: "", subject: "", year: "", medium: "", type: "", sort: "newest", shown: PAGE_SIZE };
+
+function getFiltered() {
+  const q = state.search.trim().toLowerCase();
+  let list = RESOURCES.filter(r =>
+    (!q || `${r.title} ${r.subject} ${r.level} ${r.year} ${r.type} ${r.medium}`.toLowerCase().includes(q)) &&
+    (!state.level || r.level === state.level) &&
+    (!state.subject || r.subject === state.subject) &&
+    (!state.year || String(r.year) === String(state.year)) &&
+    (!state.medium || r.medium === state.medium) &&
+    (!state.type || r.type === state.type)
+  );
+  if (state.sort === "newest") list.sort((a, b) => b.year - a.year || a.title.localeCompare(b.title));
+  if (state.sort === "oldest") list.sort((a, b) => a.year - b.year || a.title.localeCompare(b.title));
+  if (state.sort === "title") list.sort((a, b) => a.title.localeCompare(b.title));
+  return list;
+}
+
+/* ---------------- Rendering ---------------- */
+function resourceCard(r) {
+  return `
+  <article class="resource-card" data-id="${r.id}">
+    <div class="rc-top">
+      <h3 class="rc-title">${r.title}</h3>
+      <span class="rc-type ${TYPE_CLASS[r.type] || ""}">${r.type}</span>
+    </div>
+    <div class="rc-meta">
+      <span>${LEVEL_LABEL[r.level] || r.level}</span>
+      <span>${r.subject}</span>
+      <span>${r.year}</span>
+      <span>${r.medium} Medium</span>
+    </div>
+    <p class="rc-file">Format: ${r.format} · Size: ${r.size || "not specified"}</p>
+    <div class="rc-actions">
+      <button class="btn btn-outline" data-action="details" data-id="${r.id}">View Details</button>
+      <button class="btn btn-download" data-action="download" data-id="${r.id}">Download PDF</button>
+    </div>
+  </article>`;
+}
+
+function renderLibrary() {
+  const list = getFiltered();
+  const grid = $("#resourceGrid");
+  grid.innerHTML = list.slice(0, state.shown).map(resourceCard).join("");
+
+  $("#resultCount").textContent = list.length
+    ? `Showing ${Math.min(state.shown, list.length)} of ${list.length} resource${list.length === 1 ? "" : "s"}`
+    : "";
+
+  const empty = $("#emptyState");
+  empty.classList.toggle("hidden", list.length > 0);
+  grid.classList.toggle("hidden", list.length === 0);
+
+  const loadMore = $("#loadMoreBtn");
+  loadMore.classList.toggle("hidden", list.length <= state.shown);
+  loadMore.textContent = `Load more (${list.length - state.shown} remaining)`;
+}
+
+function renderFeatured() {
+  $("#featuredGrid").innerHTML = RESOURCES.filter(r => r.featured).slice(0, 6).map(resourceCard).join("");
+}
+
+function renderCategories() {
+  const cats = [
+    { icon: "🎓", name: "G.C.E. Advanced Level (A/L)", desc: "Past papers, marking schemes and model papers for all A/L streams.", level: "A/L" },
+    { icon: "📘", name: "G.C.E. Ordinary Level (O/L)", desc: "O/L past papers and schemes in Sinhala, Tamil and English media.", level: "O/L" },
+    { icon: "⭐", name: "Grade 5 Scholarship", desc: "Scholarship exam papers and practice materials for young learners.", level: "Grade 5" },
+    { icon: "🏛️", name: "University Resources", desc: "Lecture notes and past papers contributed for university courses.", level: "University" },
+    { icon: "📝", name: "Model Papers", desc: "Practice model papers to test yourself before the real exam.", type: "Model Paper" },
+    { icon: "📄", name: "Study Notes", desc: "Concise, student-friendly notes for quick revision.", type: "Notes" },
+  ];
+  $("#categoryGrid").innerHTML = cats.map(c => {
+    const count = c.level ? RESOURCES.filter(r => r.level === c.level).length
+                          : RESOURCES.filter(r => r.type === c.type).length;
+    const attrs = c.level ? `data-level-link="${c.level}"` : `data-type-link="${c.type}"`;
+    return `
+    <div class="category-card">
+      <span class="cat-icon" aria-hidden="true">${c.icon}</span>
+      <h3>${c.name}</h3>
+      <p>${c.desc}</p>
+      <span class="cat-count">${count} resource${count === 1 ? "" : "s"}</span>
+      <a href="#library" class="cat-link" ${attrs}>Browse resources</a>
+    </div>`;
+  }).join("");
+}
+
+function renderSubjects() {
+  $("#subjectGroups").innerHTML = SUBJECT_GROUPS.map(g => {
+    const items = g.subjects.map(s => {
+      const count = RESOURCES.filter(r => r.level === g.level && r.subject === s).length;
+      return `<li><button type="button" data-subject-link="${s}" data-level-link="${g.level}">
+        <span>${s}</span><span class="subject-count">${count} file${count === 1 ? "" : "s"}</span></button></li>`;
+    }).join("");
+    return `<div class="subject-group"><h3>${LEVEL_LABEL[g.level] || g.level}</h3><ul class="subject-list">${items}</ul></div>`;
+  }).join("");
+}
+
+function renderQuickLinks() {
+  const years = [...new Set(RESOURCES.map(r => r.year))].sort((a, b) => b - a).slice(0, 4);
+  const links = [
+    ...years.map(y => `<a href="#library" data-year-link="${y}">${y} Papers</a>`),
+    `<a href="#library" data-type-link="Marking Scheme">Marking Schemes</a>`,
+    `<a href="#library" data-medium-link="English">English Medium</a>`,
+    `<a href="#library" data-medium-link="Sinhala">Sinhala Medium</a>`,
+    `<a href="#library" data-medium-link="Tamil">Tamil Medium</a>`,
+  ];
+  $("#quickLinks").innerHTML = links.join("");
+}
+
+function renderHeroStats() {
+  const levels = new Set(RESOURCES.map(r => r.level)).size;
+  $("#heroStats").textContent = `📚 ${RESOURCES.length} demo resources · ${levels} exam levels · 100% free — no account needed`;
+}
+
+/* ---------------- Details modal ---------------- */
+function openModal(r) {
+  $("#modalBody").innerHTML = `
+    <h3 id="modalTitle">${r.title}</h3>
+    <div class="rc-meta">
+      <span>${LEVEL_LABEL[r.level] || r.level}</span><span>${r.subject}</span>
+      <span>${r.year}</span><span>${r.medium} Medium</span>
+      <span class="rc-type ${TYPE_CLASS[r.type] || ""}">${r.type}</span>
+    </div>
+    <p class="desc">${r.desc}</p>
+    <p class="rc-file">Format: ${r.format} · Size: ${r.size || "not specified"}</p>
+    <div class="rc-actions">
+      <button class="btn btn-download" data-action="download" data-id="${r.id}">Download PDF</button>
+      <a class="btn btn-outline" href="${reportUrl(r)}">Report a problem</a>
+    </div>`;
+  $("#modalBackdrop").classList.remove("hidden");
+  $("#modalClose").focus();
+}
+function closeModal() { $("#modalBackdrop").classList.add("hidden"); }
+
+/* ---------------- Download & reporting ---------------- */
+function reportUrl(r) {
+  const subject = encodeURIComponent(`[EduPapers LK] Report: ${r.title} (ID ${r.id})`);
+  const body = encodeURIComponent(`Please describe the problem with this resource:\n\nResource: ${r.title}\nLevel: ${r.level}\nYear: ${r.year}\n`);
+  return `mailto:${REPORT_EMAIL}?subject=${subject}&body=${body}`;
+}
+
+async function handleDownload(id, btn) {
+  const r = RESOURCES.find(x => x.id === Number(id));
+  if (!r) return;
+
+  if (!r.fileUrl) {
+    toast(`“${r.title}” is not available yet.`, "error",
+      `<a href="${reportUrl(r)}">Report this file</a>`);
+    return;
+  }
+
+  // Honest availability check: never claim success before confirming the file exists.
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = "Checking…";
+  try {
+    const res = await fetch(r.fileUrl, { method: "HEAD" });
+    if (!res.ok) throw new Error("not found");
+    window.open(r.fileUrl, "_blank", "noopener");
+    toast(`Opening “${r.title}” in a new tab.`, "success");
+  } catch {
+    toast(`Download failed — the file could not be reached.`, "error",
+      `<a href="${reportUrl(r)}">Report broken file</a>`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+/* ---------------- Event wiring ---------------- */
+function bindEvents() {
+  /* Mobile menu */
+  const navToggle = $("#navToggle"), navMenu = $("#navMenu");
+  navToggle.addEventListener("click", () => {
+    const open = navMenu.classList.toggle("open");
+    navToggle.setAttribute("aria-expanded", String(open));
+    navToggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+  });
+  navMenu.addEventListener("click", e => {
+    if (e.target.closest("a")) {
+      navMenu.classList.remove("open");
+      navToggle.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  /* Sticky header shadow */
+  window.addEventListener("scroll", () => {
+    $("#siteHeader").classList.toggle("scrolled", window.scrollY > 8);
+  }, { passive: true });
+
+  /* Active nav link highlighting */
+  const sections = ["home", "library", "subjects", "featured", "about", "contact"];
+  const spy = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      if (en.isIntersecting) {
+        $$(".nav-link").forEach(l => l.classList.toggle("active", l.getAttribute("href") === `#${en.target.id}`));
+      }
+    });
+  }, { rootMargin: "-40% 0px -55% 0px" });
+  sections.forEach(id => { const el = document.getElementById(id); if (el) spy.observe(el); });
+
+  /* Hero search → library */
+  $("#heroSearchForm").addEventListener("submit", e => {
+    e.preventDefault();
+    state.search = $("#heroSearchInput").value;
+    $("#librarySearch").value = state.search;
+    state.shown = PAGE_SIZE;
+    renderLibrary();
+    document.getElementById("library").scrollIntoView({ behavior: "smooth" });
+  });
+  $("#navSearchBtn").addEventListener("click", () => {
+    setTimeout(() => $("#librarySearch").focus(), 600);
+  });
+
+  /* Library search with debounce */
+  $("#librarySearch").addEventListener("input", debounce(e => {
+    state.search = e.target.value; state.shown = PAGE_SIZE; renderLibrary();
+  }, 250));
+
+  /* Filters */
+  const bindFilter = (id, key) => $(id).addEventListener("change", e => {
+    state[key] = e.target.value; state.shown = PAGE_SIZE; renderLibrary();
+  });
+  bindFilter("#filterLevel", "level"); bindFilter("#filterSubject", "subject");
+  bindFilter("#filterYear", "year"); bindFilter("#filterMedium", "medium");
+  bindFilter("#filterType", "type"); bindFilter("#sortBy", "sort");
+
+  const clearFilters = () => {
+    Object.assign(state, { search: "", level: "", subject: "", year: "", medium: "", type: "", sort: "newest", shown: PAGE_SIZE });
+    ["#librarySearch"].forEach(s => $(s).value = "");
+    ["#filterLevel", "#filterSubject", "#filterYear", "#filterMedium", "#filterType"].forEach(s => $(s).value = "");
+    $("#sortBy").value = "newest";
+    renderLibrary();
+  };
+  $("#clearFilters").addEventListener("click", clearFilters);
+  $("#emptyClear").addEventListener("click", clearFilters);
+
+  /* Load more */
+  $("#loadMoreBtn").addEventListener("click", () => { state.shown += PAGE_SIZE; renderLibrary(); });
+
+  /* Global click delegation: cards, quick links, categories, subjects */
+  document.addEventListener("click", e => {
+    const actionBtn = e.target.closest("[data-action]");
+    if (actionBtn) {
+      const id = actionBtn.dataset.id;
+      if (actionBtn.dataset.action === "download") handleDownload(id, actionBtn);
+      if (actionBtn.dataset.action === "details") openModal(RESOURCES.find(r => r.id === Number(id)));
+      return;
+    }
+    const link = e.target.closest("[data-level-link],[data-type-link],[data-subject-link],[data-year-link],[data-medium-link]");
+    if (link) {
+      if (link.dataset.levelLink) { state.level = link.dataset.levelLink; $("#filterLevel").value = state.level; }
+      if (link.dataset.typeLink)   { state.type = link.dataset.typeLink;   $("#filterType").value = state.type; }
+      if (link.dataset.subjectLink){ state.subject = link.dataset.subjectLink; $("#filterSubject").value = state.subject; }
+      if (link.dataset.yearLink)   { state.year = link.dataset.yearLink;   $("#filterYear").value = state.year; }
+      if (link.dataset.mediumLink) { state.medium = link.dataset.mediumLink; $("#filterMedium").value = state.medium; }
+      state.shown = PAGE_SIZE;
+      renderLibrary();
+      // let the default anchor jump to #library happen naturally
+    }
+  });
+
+  /* Modal */
+  $("#modalClose").addEventListener("click", closeModal);
+  $("#modalBackdrop").addEventListener("click", e => { if (e.target === e.currentTarget) closeModal(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+  /* Contact form — honest front-end-only handling */
+  $("#contactForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const fields = [
+      { id: "cName",    test: v => v.trim().length >= 2,  msg: "Please enter your name (min 2 characters)." },
+      { id: "cEmail",   test: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), msg: "Please enter a valid email address." },
+      { id: "cSubject", test: v => v.trim().length >= 3,  msg: "Please enter a subject (min 3 characters)." },
+      { id: "cMessage", test: v => v.trim().length >= 10, msg: "Please write a message (min 10 characters)." },
+    ];
+    let valid = true;
+    fields.forEach(f => {
+      const input = $("#" + f.id), err = $("#err-" + f.id);
+      const ok = f.test(input.value);
+      input.classList.toggle("invalid", !ok);
+      err.textContent = ok ? "" : f.msg;
+      if (!ok) valid = false;
+    });
+    const status = $("#formStatus");
+    status.classList.remove("hidden");
+    if (!valid) {
+      status.className = "form-status error";
+      status.textContent = "Please fix the highlighted fields above.";
+      return;
+    }
+    // No backend configured — say so honestly. Never pretend the message was sent.
+    status.className = "form-status info";
+    status.innerHTML = "✅ Your message is valid and ready. <strong>Demo mode:</strong> no mail service is connected yet, so nothing was sent. Connect a backend or a form service (see README.md) to enable delivery.";
+    e.target.reset();
+  });
+
+  /* Warn about unconfigured placeholder links (developer profile links) */
+  $$("[data-config-link]").forEach(a => a.addEventListener("click", e => {
+    if (a.getAttribute("href") === "#") { e.preventDefault(); toast("Developer link not configured yet.", "error"); }
+  }));
+}
+
+/* ---------------- Init ---------------- */
+document.addEventListener("DOMContentLoaded", () => {
+  populateFilters();
+  renderCategories();
+  renderSubjects();
+  renderFeatured();
+  renderQuickLinks();
+  renderHeroStats();
+  renderLibrary();
+  bindEvents();
+  $("#copyrightYear").textContent = new Date().getFullYear(); // dynamic copyright year
+});
